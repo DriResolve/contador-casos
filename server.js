@@ -7,13 +7,16 @@ const creds = require('./credentials.json');
 const app = express();
 app.use(express.json());
 
-// SUBSTITUA AQUI PELO ID DA SUA PLANILHA:
+// ID da sua planilha verificado na imagem
 const SPREADSHEET_ID = '1JUJ-Kl-SSVtFf0Nj8OrQv90eJjc-wvxJGSeowXr2B5E';
+
+// Ajuste para garantir que as quebras de linha (\n) da chave do Google funcionem no servidor
+const formattedPrivateKey = creds.private_key.replace(/\\n/g, '\n');
 
 // Configuração de acesso ao Google
 const serviceAccountAuth = new JWT({
   email: creds.client_email,
-  key: creds.private_key,
+  key: formattedPrivateKey,
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
@@ -23,26 +26,31 @@ const doc = new GoogleSpreadsheet(SPREADSHEET_ID, serviceAccountAuth);
 app.post('/api/clique', async (req, res) => {
   try {
     const { time, caso } = req.body;
+    
+    // Tenta carregar a planilha
     await doc.loadInfo();
-    const sheet = doc.sheetsByIndex[0]; // Pega a primeira aba
+    const sheet = doc.sheetsByIndex[0]; 
     const rows = await sheet.getRows();
 
-    // Procura a linha que tem o Time E o Caso certos
-    const rowToUpdate = rows.find(row => 
-      row.get('TIMES') === time && row.get('CASOS') === caso
-    );
+    // Procura a linha que tem o Time E o Caso certos (letras exatas)
+    const rowToUpdate = rows.find(row => {
+      const rowTime = (row.get('TIMES') || '').toString().trim().toUpperCase();
+      const rowCaso = (row.get('CASOS') || '').toString().trim().toUpperCase();
+      return rowTime === time.toUpperCase() && rowCaso === caso.toUpperCase();
+    });
 
     if (rowToUpdate) {
       const cliquesAtuais = parseInt(rowToUpdate.get('CLICKS') || 0);
       rowToUpdate.set('CLICKS', cliquesAtuais + 1);
-      await rowToUpdate.save(); // Salva no Google Sheets
+      await rowToUpdate.save(); 
       return res.json({ success: true, novoTotal: cliquesAtuais + 1 });
     }
 
-    res.status(404).json({ success: false, error: 'Linha não encontrada' });
+    res.status(404).json({ success: false, error: `Linha nao encontrada para ${time} - ${caso}` });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, error: error.message });
+    // Melhoria: Se der erro, ele vai te dizer o motivo REAL na tela do celular agora!
+    console.error('Erro detalhado:', error);
+    res.status(500).json({ success: false, error: error.message || 'Erro interno no Google API' });
   }
 });
 
@@ -57,9 +65,9 @@ app.get('/', (req, res) => {
         <title>Contador de Casos</title>
         <style>
             body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f9; text-align: center; }
-            h1 { color: #333; }
+            h1 { color: #333; font-size: 24px; margin-bottom: 20px; }
             .btn-time { background: #007bff; color: white; padding: 15px; margin: 10px; border: none; border-radius: 8px; width: 80%; font-size: 18px; cursor: pointer; }
-            .btn-caso { background: #28a745; color: white; padding: 12px; margin: 5px; border: none; border-radius: 6px; width: 90%; font-size: 14px; cursor: pointer; }
+            .btn-caso { background: #1e5631; color: white; padding: 12px; margin: 6px; border: none; border-radius: 6px; width: 90%; font-size: 14px; cursor: pointer; display: block; margin-left: auto; margin-right: auto; }
             .back-btn { background: #6c757d; margin-top: 20px; }
             .hidden { display: none; }
             #casos-container { max-width: 400px; margin: 0 auto; }
@@ -69,7 +77,7 @@ app.get('/', (req, res) => {
 
         <div id="tela-times">
             <h1>Selecione o Nome</h1>
-            <button class="btn-time" onclick="selecionarTime('BIGCODES')">BIGCODES</button>
+            <button class="btn-time" onclick="selecionarTime('BIGODES')">BIGODES</button>
             <button class="btn-time" onclick="selecionarTime('GABRIEL')">GABRIEL</button>
             <button class="btn-time" onclick="selecionarTime('LAURA')">LAURA</button>
             <button class="btn-time" onclick="selecionarTime('ADRIELE')">ADRIELE</button>
@@ -108,7 +116,7 @@ app.get('/', (req, res) => {
             }
 
             async function computar(caso) {
-                if(!confirm(\`Somar +1 em "\${caso}" para \${timeSelecionado}?\`)) return;
+                if(!confirm('Somar +1 em "' + caso + '" para ' + timeSelecionado + '?')) return;
                 
                 try {
                     const response = await fetch('/api/clique', {
@@ -133,4 +141,4 @@ app.get('/', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor a rodar na porta ${PORT}`));
+app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
