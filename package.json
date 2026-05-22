@@ -1,0 +1,14 @@
+{
+  "name": "contador-render",
+  "version": "1.0.0",
+  "description": "Contador de cliques para o Google Sheets",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "google-spreadsheet": "^4.1.4",
+    "google-auth-library": "^9.10.0"
+  }
+}
