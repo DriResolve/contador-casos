@@ -6,9 +6,11 @@
   "scripts": {
     "start": "node server.js"
   },
+  "engines": {
+    "node": "20.x"
+  },
   "dependencies": {
     "express": "^4.19.2",
-    "google-spreadsheet": "^4.1.4",
     "google-auth-library": "^9.10.0"
   }
 }
