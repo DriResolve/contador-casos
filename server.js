@@ -1,5 +1,4 @@
 const express = require('express');
-const { GoogleSpreadsheet } = require('google-spreadsheet');
 const { JWT } = require('google-auth-library');
 const path = require('path');
 const creds = require('./credentials.json');
@@ -7,54 +6,85 @@ const creds = require('./credentials.json');
 const app = express();
 app.use(express.json());
 
-// ID da sua planilha verificado na imagem
 const SPREADSHEET_ID = '1JUJ-Kl-SSVtFf0Nj8OrQv90eJjc-wvxJGSeowXr2B5E';
 
-// Ajuste para garantir que as quebras de linha (\n) da chave do Google funcionem no servidor
-const formattedPrivateKey = creds.private_key.replace(/\\n/g, '\n');
+// Garante que a chave privada está no formato correto
+const privateKey = creds.private_key ? creds.private_key.replace(/\\n/g, '\n') : null;
 
-// Configuração de acesso ao Google
-const serviceAccountAuth = new JWT({
+// Configuração de autenticação direta com o Google
+const auth = new JWT({
   email: creds.client_email,
-  key: formattedPrivateKey,
+  key: privateKey,
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
-const doc = new GoogleSpreadsheet(SPREADSHEET_ID, serviceAccountAuth);
-
-// Rota que recebe o clique do telemóvel e soma na planilha
 app.post('/api/clique', async (req, res) => {
   try {
     const { time, caso } = req.body;
-    
-    // Tenta carregar a planilha
-    await doc.loadInfo();
-    const sheet = doc.sheetsByIndex[0]; 
-    const rows = await sheet.getRows();
 
-    // Procura a linha que tem o Time E o Caso certos (letras exatas)
-    const rowToUpdate = rows.find(row => {
-      const rowTime = (row.get('TIMES') || '').toString().trim().toUpperCase();
-      const rowCaso = (row.get('CASOS') || '').toString().trim().toUpperCase();
-      return rowTime === time.toUpperCase() && rowCaso === caso.toUpperCase();
-    });
-
-    if (rowToUpdate) {
-      const cliquesAtuais = parseInt(rowToUpdate.get('CLICKS') || 0);
-      rowToUpdate.set('CLICKS', cliquesAtuais + 1);
-      await rowToUpdate.save(); 
-      return res.json({ success: true, novoTotal: cliquesAtuais + 1 });
+    if (!privateKey || !creds.client_email) {
+      return res.status(500).json({ success: false, error: 'As credenciais do arquivo credentials.json estao incompletas ou erradas.' });
     }
 
-    res.status(404).json({ success: false, error: `Linha nao encontrada para ${time} - ${caso}` });
+    // Pega o token de acesso para falar com o Google Sheets
+    const authHeaders = await auth.getRequestHeaders();
+    const token = authHeaders.Authorization;
+
+    // 1. Busca os dados da planilha via API oficial do Google
+    const urlBusca = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/A1:C100`;
+    const responseBusca = await fetch(urlBusca, { headers: { 'Authorization': token } });
+    
+    if (!responseBusca.ok) {
+      const errData = await responseBusca.json().catch(() => ({}));
+      return res.status(responseBusca.status).json({ success: false, error: `Erro Google Busca: ${errData.error?.message || responseBusca.statusText}` });
+    }
+
+    const dataBusca = await responseBusca.json();
+    const linhas = dataBusca.values || [];
+
+    // Encontra a linha correta (Ignorando a primeira linha de cabeçalho)
+    let linhaIndex = -1;
+    let cliquesAtuais = 0;
+
+    for (let i = 1; i < linhas.length; i++) {
+      const rowTime = (linhas[i][0] || '').toString().trim().toUpperCase();
+      const rowCaso = (linhas[i][1] || '').toString().trim().toUpperCase();
+      
+      if (rowTime === time.toUpperCase() && rowCaso === caso.toUpperCase()) {
+        linhaIndex = i + 1; // O Google Sheets começa na linha 1
+        cliquesAtuais = parseInt(linhas[i][2] || 0);
+        break;
+      }
+    }
+
+    if (linhaIndex === -1) {
+      return res.status(404).json({ success: false, error: `Nao encontrei na planilha a linha para: ${time} - ${caso}` });
+    }
+
+    // 2. Salva o novo valor somando +1 na coluna C
+    const novoTotal = cliquesAtuais + 1;
+    const urlSalvar = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/C${linhaIndex}?valueInputOption=USER_ENTERED`;
+    
+    const responseSalvar = await fetch(urlSalvar, {
+      method: 'PUT',
+      headers: { 'Authorization': token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: [[novoTotal]] })
+    });
+
+    if (!responseSalvar.ok) {
+      const errData = await responseSalvar.json().catch(() => ({}));
+      return res.status(responseSalvar.status).json({ success: false, error: `Erro Google Salvar: ${errData.error?.message || responseSalvar.statusText}` });
+    }
+
+    return res.json({ success: true, novoTotal: novoTotal });
+
   } catch (error) {
-    // Melhoria: Se der erro, ele vai te dizer o motivo REAL na tela do celular agora!
-    console.error('Erro detalhado:', error);
-    res.status(500).json({ success: false, error: error.message || 'Erro interno no Google API' });
+    console.error('Erro no servidor:', error);
+    return res.status(500).json({ success: false, error: error.message || 'Erro interno desconhecido' });
   }
 });
 
-// Página Web (Interface para o Telemóvel)
+// Página Web (Interface do Celular)
 app.get('/', (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -64,11 +94,11 @@ app.get('/', (req, res) => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Contador de Casos</title>
         <style>
-            body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f9; text-align: center; }
-            h1 { color: #333; font-size: 24px; margin-bottom: 20px; }
-            .btn-time { background: #007bff; color: white; padding: 15px; margin: 10px; border: none; border-radius: 8px; width: 80%; font-size: 18px; cursor: pointer; }
-            .btn-caso { background: #1e5631; color: white; padding: 12px; margin: 6px; border: none; border-radius: 6px; width: 90%; font-size: 14px; cursor: pointer; display: block; margin-left: auto; margin-right: auto; }
-            .back-btn { background: #6c757d; margin-top: 20px; }
+            body { font-family: Arial, sans-serif; margin: 20px; background: #222; color: #fff; text-align: center; }
+            h1 { font-size: 24px; margin-bottom: 20px; color: #ffc107; }
+            .btn-time { background: #007bff; color: white; padding: 15px; margin: 10px; border: none; border-radius: 8px; width: 85%; font-size: 18px; font-weight: bold; cursor: pointer; }
+            .btn-caso { background: #28a745; color: white; padding: 14px; margin: 8px; border: none; border-radius: 6px; width: 90%; font-size: 14px; text-align: left; cursor: pointer; display: block; margin-left: auto; margin-right: auto; }
+            .back-btn { background: #6c757d; margin-top: 20px; width: 50%; }
             .hidden { display: none; }
             #casos-container { max-width: 400px; margin: 0 auto; }
         </style>
@@ -86,16 +116,16 @@ app.get('/', (req, res) => {
         <div id="tela-casos" class="hidden">
             <h1 id="titulo-time">Casos</h1>
             <div id="casos-container">
-                <button class="btn-caso" onclick="computar('Utilizar escada pelo lado errado')">Utilizar escada pelo lado errado</button>
-                <button class="btn-caso" onclick="computar('Utilizar escada sem segurar no corrimão')">Utilizar escada sem segurar no corrimão</button>
-                <button class="btn-caso" onclick="computar('Utilizar escada utilizando o celular')">Utilizar escada utilizando o celular</button>
-                <button class="btn-caso" onclick="computar('Transitar com as mãos nos bolsos')">Transitar com as mãos nos bolsos</button>
-                <button class="btn-caso" onclick="computar('Transitar fora da calçada')">Transitar fora da calçada</button>
-                <button class="btn-caso" onclick="computar('Transitar fora da faixa de pedestre')">Transitar fora da faixa de pedestre</button>
-                <button class="btn-caso" onclick="computar('Transitar utilizando o celular')">Transitar utilizando o celular</button>
-                <button class="btn-caso" onclick="computar('Descarte inadequado de lixo')">Descarte inadequado de lixo</button>
-                <button class="btn-caso" onclick="computar('Desvio comportamental')">Desvio comportamental</button>
-                <button class="btn-caso" onclick="computar('Transitar se alimentando')">Transitar se alimentando</button>
+                <button class="btn-caso" onclick="computar('Utilizar escada pelo lado errado')">1. Utilizar escada pelo lado errado</button>
+                <button class="btn-caso" onclick="computar('Utilizar escada sem segurar no corrimão')">2. Utilizar escada sem segurar no corrimão</button>
+                <button class="btn-caso" onclick="computar('Utilizar escada utilizando o celular')">3. Utilizar escada utilizando o celular</button>
+                <button class="btn-caso" onclick="computar('Transitar com as mãos nos bolsos')">4. Transitar com as mãos nos bolsos</button>
+                <button class="btn-caso" onclick="computar('Transitar fora da calçada')">5. Transitar fora da calçada</button>
+                <button class="btn-caso" onclick="computar('Transitar fora da faixa de pedestre')">6. Transitar fora da faixa de pedestre</button>
+                <button class="btn-caso" onclick="computar('Transitar utilizando o celular')">7. Transitar utilizando o celular</button>
+                <button class="btn-caso" onclick="computar('Descarte inadequado de lixo')">8. Descarte inadequado de lixo</button>
+                <button class="btn-caso" onclick="computar('Desvio comportamental')">9. Desvio comportamental</button>
+                <button class="btn-caso" onclick="computar('Transitar se alimentando')">10. Transitar se alimentando</button>
             </div>
             <button class="btn-time back-btn" onclick="voltar()">← Voltar</button>
         </div>
@@ -116,7 +146,7 @@ app.get('/', (req, res) => {
             }
 
             async function computar(caso) {
-                if(!confirm('Somar +1 em "' + caso + '" para ' + timeSelecionado + '?')) return;
+                if(!confirm('Confirmar +1 para ' + timeSelecionado + '?')) return;
                 
                 try {
                     const response = await fetch('/api/clique', {
@@ -124,14 +154,15 @@ app.get('/', (req, res) => {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ time: timeSelecionado, caso: caso })
                     });
+                    
                     const data = await response.json();
-                    if(data.success) {
-                        alert('Sucesso! Registado na planilha.');
+                    if(response.ok && data.success) {
+                        alert('Sucesso! Registrado. Novo total: ' + data.novoTotal);
                     } else {
-                        alert('Erro ao salvar: ' + data.error);
+                        alert('Erro indicado pelo servidor: ' + (data.error || 'Erro desconhecido'));
                     }
                 } catch (err) {
-                    alert('Erro de conexão.');
+                    alert('Erro de rede ou conexao com o servidor.');
                 }
             }
         </script>
@@ -140,5 +171,5 @@ app.get('/', (req, res) => {
   `);
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
