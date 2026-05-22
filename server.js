@@ -1,19 +1,18 @@
 const express = require('express');
 const { JWT } = require('google-auth-library');
-const path = require('path');
-const creds = require('./credentials.json');
 
 const app = express();
 app.use(express.json());
 
 const SPREADSHEET_ID = '1JUJ-Kl-SSVtFf0Nj8OrQv90eJjc-wvxJGSeowXr2B5E';
 
-// Garante que a chave privada está no formato correto
-const privateKey = creds.private_key ? creds.private_key.replace(/\\n/g, '\n') : null;
+// Pega os dados diretamente do sistema do Render (Sem quebrar linhas)
+const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
+const privateKey = process.env.GOOGLE_PRIVATE_KEY ? process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : null;
 
 // Configuração de autenticação direta com o Google
 const auth = new JWT({
-  email: creds.client_email,
+  email: clientEmail,
   key: privateKey,
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
@@ -22,15 +21,14 @@ app.post('/api/clique', async (req, res) => {
   try {
     const { time, caso } = req.body;
 
-    if (!privateKey || !creds.client_email) {
-      return res.status(500).json({ success: false, error: 'As credenciais do arquivo credentials.json estao incompletas ou erradas.' });
+    if (!privateKey || !clientEmail) {
+      return res.status(500).json({ success: false, error: 'Configuracao incompleta no Render: Variaveis GOOGLE_CLIENT_EMAIL ou GOOGLE_PRIVATE_KEY estao faltando.' });
     }
 
-    // Pega o token de acesso para falar com o Google Sheets
     const authHeaders = await auth.getRequestHeaders();
     const token = authHeaders.Authorization;
 
-    // 1. Busca os dados da planilha via API oficial do Google
+    // 1. Busca os dados da planilha
     const urlBusca = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/A1:C100`;
     const responseBusca = await fetch(urlBusca, { headers: { 'Authorization': token } });
     
@@ -42,7 +40,6 @@ app.post('/api/clique', async (req, res) => {
     const dataBusca = await responseBusca.json();
     const linhas = dataBusca.values || [];
 
-    // Encontra a linha correta (Ignorando a primeira linha de cabeçalho)
     let linhaIndex = -1;
     let cliquesAtuais = 0;
 
@@ -51,7 +48,7 @@ app.post('/api/clique', async (req, res) => {
       const rowCaso = (linhas[i][1] || '').toString().trim().toUpperCase();
       
       if (rowTime === time.toUpperCase() && rowCaso === caso.toUpperCase()) {
-        linhaIndex = i + 1; // O Google Sheets começa na linha 1
+        linhaIndex = i + 1; 
         cliquesAtuais = parseInt(linhas[i][2] || 0);
         break;
       }
@@ -61,7 +58,7 @@ app.post('/api/clique', async (req, res) => {
       return res.status(404).json({ success: false, error: `Nao encontrei na planilha a linha para: ${time} - ${caso}` });
     }
 
-    // 2. Salva o novo valor somando +1 na coluna C
+    // 2. Salva o novo valor somando +1
     const novoTotal = cliquesAtuais + 1;
     const urlSalvar = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/C${linhaIndex}?valueInputOption=USER_ENTERED`;
     
