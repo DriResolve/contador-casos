@@ -5,15 +5,44 @@ const app = express();
 app.use(express.json());
 
 const SPREADSHEET_ID = '1JUJ-Kl-SSVtFf0Nj8OrQv90eJjc-wvxJGSeowXr2B5E';
+const CLIENT_EMAIL = 'robo-contador@contador-render.iam.gserviceaccount.com';
 
-// Pega os dados diretamente do sistema do Render (Sem quebrar linhas)
-const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
-const privateKey = process.env.GOOGLE_PRIVATE_KEY ? process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n') : null;
+// Montando a chave como uma array para garantir que as quebras de linha funcionem perfeitamente em qualquer servidor
+const PRIVATE_KEY = [
+  '-----BEGIN PRIVATE KEY-----',
+  'MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDInI56R26o3M5Z',
+  'aGkSF+cH5a1LOboWR4AMBEG4tWyzjOxvSQ95oUWJw2vSa4+rp/UBJ8Op7JB6xd9Z',
+  'YyxdMVm160LTPQ6En+vZabIDMWEQbzmNh1RE8OjGO57MX5NV4CPyr6DGN6w+lFw8',
+  'Sz96EUAzWj4pMJ3sy8+b3o1L+YVfRU1ZX5wjOKmsY9pLV9vKz+8dkuLRjLFlQuo+',
+  'TP1iQp3V5ZQ8wQ4/derWO74/A7tfJnIZ0Av54+7T2QjOnYEw9Wz0u6ueeCbjcV09',
+  'z+PEk54xZJweIZfTurmFrcfSl77j6sa8pYhHaLKfbooL4klpWOzcoUwaOGz6exuE',
+  'rwUscZ45AgMBAAECggEAAMJ4VvsymT4YzprdcahDLjL5ndl5RxX8j08W0Um9QHgj',
+  'Tw/nmJjP6BkkLTb4uM2D2SjFjhJWFmOYbcC5OB3J5AKg4qbjtASHrUTqsSYR4tuL',
+  'oWm78R+OahhrXgUV9uhzNRCNhc1L1YLUpJUjsjp4KURJYaOMUuC6B7I8i7yapi/d',
+  'xp5FhZePwql5GrSyDSXBCLxhhMwDI89bHZAiBsahcQsz+QcPBgKlGbdpAAkbvRwl',
+  'JY4RdmnJjmeYUUAZ00IGetQE/W2DiZ5VvJsSBoM9/9nTIEtXPCd/gIPBUeDVi2Bn',
+  'HIPYBVszQ9MSTKSzbccdAif21zU4EoHdryu34VLEmQKBgQDvDS9mh0jGotlpyvpb',
+  'pFveHxJDj8xcQ9dJuwo/YMrgKbmwl4nOdTSFIghup8G0LqSTW9j2n9Kochh3ibWo',
+  'S3hcn6EIr7cmcLXNq+RIAxokXbSWIb/+pqGMvTVGF9WEqnVKQwwoEpl+N+VldrhG',
+  'x+w8jE25HP/kKtmp2rhBkT8PZQKBgQDW1a5ufGNnBNRv+RfGzWx8dZBZRVRtYj3M',
+  'nnBsbSNPXdCVWxVV0rCqWrJ/q5beD9J/dVQomOEiqwug5vuL0jO2aXo+QEzLafNYD',
+  '2qw0K3MaI6SzKn3vqSlYyIye/dLP7YV851XFb+VuJYMraPp73IYuvxNy1UWn3k7k',
+  'pUAf420YRQKBgQDZH0uvPy79o8n/CepNNEJwxB3tmX1PTBsNj8HmAL8jzSIoX+s9',
+  'xzy1s0yfXOVWB4tZgHHWxyEp9797S2vgePPQhPhZkGe0lWi7buW/9nlXEHlGZ08g',
+  'Ny7CStRJXrqDbeNsWOuAtiwN9Sz49FS5jTpnYDPz74AIOFdMrCjw/MCe9QKBgQCu',
+  'tg3qGkx4biwZd7iHW24bdTxT7Rbw8dESQe2lbb+h2vm2rDqH7K+h43cV/4UT0e/k',
+  'fpEHbgRioqlatMs7WBSu0rHr2EEmABnH/qDGuIMdwdjiP+805RwT8NyzO/aiVCaX',
+  '4kYVj59EyUr4FaKG8ltJTukRHTJNh3Qfa+hPRpPlBQKBgBlYCy+uhfHDBMyy69VX',
+  '3HtqLkzmkJN1DqjGnreMn5JVCoWLeRhyLlOpfUv/PaUVy+uYwWhfpQ4tQa/Yi5kL',
+  '4YUNBjBnV+1UllJ+YQBBDKW8mcq7ptyHMKeCIQU5xiE2XfMAnYjdFCLJMYoBKIY9',
+  'BKWqX8rJBNE7qtOOoom0umFZ',
+  '-----END PRIVATE KEY-----'
+].join('\n');
 
 // Configuração de autenticação direta com o Google
 const auth = new JWT({
-  email: clientEmail,
-  key: privateKey,
+  email: CLIENT_EMAIL,
+  key: PRIVATE_KEY,
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
@@ -21,14 +50,10 @@ app.post('/api/clique', async (req, res) => {
   try {
     const { time, caso } = req.body;
 
-    if (!privateKey || !clientEmail) {
-      return res.status(500).json({ success: false, error: 'Configuracao incompleta no Render: Variaveis GOOGLE_CLIENT_EMAIL ou GOOGLE_PRIVATE_KEY estao faltando.' });
-    }
-
     const authHeaders = await auth.getRequestHeaders();
     const token = authHeaders.Authorization;
 
-    // 1. Busca os dados da planilha
+    // 1. Busca os dados da planilha via API do Google
     const urlBusca = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/A1:C100`;
     const responseBusca = await fetch(urlBusca, { headers: { 'Authorization': token } });
     
@@ -58,7 +83,7 @@ app.post('/api/clique', async (req, res) => {
       return res.status(404).json({ success: false, error: `Nao encontrei na planilha a linha para: ${time} - ${caso}` });
     }
 
-    // 2. Salva o novo valor somando +1
+    // 2. Salva o novo valor somando +1 na coluna C
     const novoTotal = cliquesAtuais + 1;
     const urlSalvar = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/C${linhaIndex}?valueInputOption=USER_ENTERED`;
     
