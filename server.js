@@ -199,7 +199,7 @@ body {
 }
 
 .logo-img {
-    width: 120px;
+    width: 300px;
     height: auto;
     filter: drop-shadow(0px 4px 10px rgba(0,0,0,0.6));
 }
@@ -308,7 +308,7 @@ h2 {
         <img class="logo-img" src="https://i.postimg.cc/kMQTpLZC/Whats-App-Image-2026-05-22-at-18-13-07-removebg-preview.png" alt="Segurança do Trabalho">
     </button>
     <div class="app-title">SEGURANÇA DO TRABALHO</div>
-    <div class="subtitle">Inspeção e Coleta de Desvios</div>
+    <div class="subtitle">Inspeção e Coleta de Dados</div>
 </div>
 
 <div id="tela-times" class="card">
@@ -320,7 +320,7 @@ h2 {
 </div>
 
 <div id="tela-casos" class="card hidden">
-    <h2>Colaborador: <span id="titulo-time" style="color: #fff;">-</span></h2>
+    <h2>GRUPO: <span id="titulo-time" style="color: #fff;">-</span></h2>
     
     <div id="casos-container">
         <button class="btn-caso" onclick="computar('Utilizar escada pelo lado errado')"><span>01.</span> Utilizar escada pelo lado errado</button>
