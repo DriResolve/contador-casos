@@ -112,21 +112,19 @@ app.post('/api/fechamento', async (req, res) => {
       const desvio = linhas[i][1];
       const cliques = parseInt(linhas[i][2] || 0);
 
-      if (cliques > 0) {
-        relatorioTexto += `• Colaborador: ${colaborador}\n  Desvio: ${desvio}\n  Quantidade: ${cliques}\n`;
-        relatorioTexto += '-----------------------------------------\n';
-        dadosEncontrados = true;
+      if (colaborador) {
+        if (cliques > 0) {
+          relatorioTexto += `• Colaborador: ${colaborador}\n  Desvio: ${desvio}\n  Quantidade: ${cliques}\n`;
+          relatorioTexto += '-----------------------------------------\n';
+          dadosEncontrados = true;
+        }
+        colC_Zeradada.push([0]); // Prepara a zeragem da linha
       }
-      colC_Zeradada.push([0]); // Prepara a zeragem da linha
     }
 
     if (!dadosEncontrados) relatorioTexto += 'Nenhum desvio coletado neste período.\n';
 
     // 2. Dispara o relatório por E-mail via Formspree
-    if (LINK_FORMSPREEE.includes('https://formspree.io/f/xaqkjkja')) {
-      return res.status(400).json({ success: false, error: 'Configure o link do Formspree na linha 14 do código.' });
-    }
-
     await fetch(LINK_FORMSPREEE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -172,6 +170,8 @@ app.get('/', (req, res) => {
     --blue-accent: #007bff;
     --text-white: #ffffff;
     --text-muted: #b3b3b3;
+    --modal-overlay: rgba(0, 0, 0, 0.8);
+    --modal-bg: #222222;
 }
 
 body {
@@ -298,13 +298,124 @@ h2 {
 .hidden {
     display: none !important;
 }
+
+/* ==========================================================================
+   ESTILOS DOS NOVOS MODAIS ARREDONDADOS (SUBSTITUTOS DO ALERT/PROMPT/CONFIRM)
+   ========================================================================== */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: var(--modal-overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-box {
+    background: var(--modal-bg);
+    width: 85%;
+    max-width: 380px;
+    padding: 25px 20px;
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+    text-align: center;
+    transform: scale(0.8);
+    transition: all 0.3s ease;
+    box-sizing: border-box;
+}
+
+.modal-overlay.active .modal-box {
+    transform: scale(1);
+}
+
+.modal-box h3 {
+    margin-top: 0;
+    font-size: 19px;
+    color: #ffc107;
+}
+
+.modal-text {
+    font-size: 14px;
+    color: #e0e0e0;
+    line-height: 1.5;
+    margin-bottom: 22px;
+}
+
+.modal-input {
+    width: 100%;
+    padding: 14px;
+    background: #111;
+    border: 1px solid #444;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 20px;
+    text-align: center;
+    font-weight: bold;
+    letter-spacing: 4px;
+    margin-bottom: 20px;
+    box-sizing: border-box;
+    outline: none;
+}
+
+.modal-input:focus {
+    border-color: var(--blue-accent);
+}
+
+.modal-flex-btns {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+}
+
+.m-btn {
+    flex: 1;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: bold;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.m-btn-confirm { background: #28a745; color: white; }
+.m-btn-confirm:active { background: #1e7e34; }
+.m-btn-cancel { background: #dc3545; color: white; }
+.m-btn-cancel:active { background: #bd2130; }
+.m-btn-ok { background: var(--blue-accent); color: white; width: 60%; flex: none; }
+.m-btn-ok:active { background: #0056b3; }
+
+/* Spinner de Carregamento Interno */
+.loading-spinner {
+    border: 4px solid rgba(255,255,255,0.1);
+    border-top: 4px solid #ffc107;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    animation: spin 0.9s linear infinite;
+    margin: 15px auto;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
 </style>
 </head>
 
 <body>
 
 <div class="header-container">
-    <button class="logo-btn" onclick="solicitarFechamento()">
+    <button class="logo-btn" onclick="abrirModalSenha()">
         <img class="logo-img" src="https://i.postimg.cc/d003T7kJ/Seguranca.png" alt="Segurança do Trabalho">
     </button>
 </div>
@@ -321,17 +432,17 @@ h2 {
     <h2>GRUPO: <span id="titulo-time" style="color: #fff;">-</span></h2>
     
     <div id="casos-container">
-        <button class="btn-caso" onclick="computar('Utilizar escada pelo lado errado')"><span>01.</span> Utilizar escada pelo lado errado</button>
-        <button class="btn-caso" onclick="computar('Utilizar escada sem segurar no corrimão')"><span>02.</span> Utilizar escada sem segurar no corrimão</button>
-        <button class="btn-caso" onclick="computar('Utilizar escada utilizando o celular')"><span>03.</span> Utilizar escada utilizando o celular</button>
-        <button class="btn-caso" onclick="computar('Transitar com as mãos nos bolsos')"><span>04.</span> Transitar com as mãos nos bolsos</button>
-        <button class="btn-caso" onclick="computar('Transitar fora da calçada')"><span>05.</span> Transitar fora da calçada</button>
-        <button class="btn-caso" onclick="computar('Transitar fora da faixa de pedestre')"><span>06.</span> Transitar fora da faixa de pedestre</button>
-        <button class="btn-caso" onclick="computar('Transitar utilizando o celular')"><span>07.</span> Transitar utilizando o celular</button>
-        <button class="btn-caso" onclick="computar('Descarte inadequado de lixo')"><span>08.</span> Descarte inadequado de lixo</button>
-        <button class="btn-caso" onclick="computar('Desvio comportamental')"><span>09.</span> Desvio comportamental</button>
-        <button class="btn-caso" onclick="computar('Transitar se alimentando')"><span>10.</span> Transitar se alimentando</button>
-        <button class="btn-caso" onclick="computar('Uso da escada simultâneo em paralelo')"><span>11.</span> Uso da escada simultâneo em paralelo</button>
+        <button class="btn-caso" onclick="pedirConfirmacaoClique('Utilizar escada pelo lado errado')"><span>01.</span> Utilizar escada pelo lado errado</button>
+        <button class="btn-caso" onclick="pedirConfirmacaoClique('Utilizar escada sem segurar no corrimão')"><span>02.</span> Utilizar escada sem segurar no corrimão</button>
+        <button class="btn-caso" onclick="pedirConfirmacaoClique('Utilizar escada utilizando o celular')"><span>03.</span> Utilizar escada utilizando o celular</button>
+        <button class="btn-caso" onclick="pedirConfirmacaoClique('Transitar com as mãos nos bolsos')"><span>04.</span> Transitar com as mãos nos bolsos</button>
+        <button class="btn-caso" onclick="pedirConfirmacaoClique('Transitar fora da calçada')"><span>05.</span> Transitar fora da calçada</button>
+        <button class="btn-caso" onclick="pedirConfirmacaoClique('Transitar fora da faixa de pedestre')"><span>06.</span> Transitar fora da faixa de pedestre</button>
+        <button class="btn-caso" onclick="pedirConfirmacaoClique('Transitar utilizando o celular')"><span>07.</span> Transitar utilizando o celular</button>
+        <button class="btn-caso" onclick="pedirConfirmacaoClique('Descarte inadequado de lixo')"><span>08.</span> Descarte inadequado de lixo</button>
+        <button class="btn-caso" onclick="pedirConfirmacaoClique('Desvio comportamental')"><span>09.</span> Desvio comportamental</button>
+        <button class="btn-caso" onclick="pedirConfirmacaoClique('Transitar se alimentando')"><span>10.</span> Transitar se alimentando</button>
+        <button class="btn-caso" onclick="pedirConfirmacaoClique('Uso da escada simultâneo em paralelo')"><span>11.</span> Uso da escada simultâneo em paralelo</button>
     </div>
 
     <button class="btn-time back-btn" onclick="voltar()">
@@ -339,12 +450,61 @@ h2 {
     </button>
 </div>
 
+
+<div id="m-confirm-clique" class="modal-overlay">
+    <div class="modal-box">
+        <h3>Confirmar Registro</h3>
+        <div id="txt-confirm-clique" class="modal-text"></div>
+        <div class="modal-flex-btns">
+            <button class="m-btn m-btn-cancel" onclick="fecharModais()">Cancelar</button>
+            <button class="m-btn m-btn-confirm" onclick="executarEnvioClique()">Confirmar</button>
+        </div>
+    </div>
+</div>
+
+<div id="m-senha-admin" class="modal-overlay">
+    <div class="modal-box">
+        <h3>Painel de Controle</h3>
+        <div class="modal-text">Por favor, insira a senha administrativa de 4 dígitos:</div>
+        <input type="password" id="campo-senha" class="modal-input" maxlength="4" placeholder="••••" inputmode="numeric">
+        <div class="modal-flex-btns">
+            <button class="m-btn m-btn-cancel" onclick="fecharModais()">Cancelar</button>
+            <button class="m-btn m-btn-confirm" onclick="validarSenhaAdmin()">Acessar</button>
+        </div>
+    </div>
+</div>
+
+<div id="m-confirm-fechamento" class="modal-overlay">
+    <div class="modal-box">
+        <h3 style="color: #dc3545;">⚠️ Atenção! Fechamento</h3>
+        <div class="modal-text">Você confirmou a senha administrativa.<br><br>Ao continuar, o sistema gerará o relatório para e-mail e <b style="color:#dc3545;">ZERARÁ COMPLETAMENTE</b> os registros da planilha. Quer continuar?</div>
+        <div class="modal-flex-btns">
+            <button class="m-btn m-btn-cancel" onclick="fecharModais()">Cancelar</button>
+            <button class="m-btn m-btn-confirm" onclick="executarProcessoFechamento()">Sim, Resetar</button>
+        </div>
+    </div>
+</div>
+
+<div id="m-status" class="modal-overlay">
+    <div class="modal-box">
+        <h3 id="status-titulo">-</h3>
+        <div id="status-corpo" class="modal-text">-</div>
+        <div id="status-bloco-btn" class="hidden">
+            <button class="m-btn m-btn-ok" onclick="fecharModaisEResetarInterface()">OK</button>
+        </div>
+    </div>
+</div>
+
+
 <script>
 let timeSelecionado = '';
+let casoSelecionado = '';
+let senhaDigitadaValida = ''; // Guarda temporariamente para a rota de fechamento
+let bloqueioEnvio = false; // Bloqueio antiduplo clique global
 
 function selecionarTime(time){
     timeSelecionado = time;
-    document.getElementById('titulo-time').innerText = time;
+    document.getElementById('titulo-time').innerText = 'GRUPO ' + time;
     document.getElementById('tela-times').classList.add('hidden');
     document.getElementById('tela-casos').classList.remove('hidden');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -355,51 +515,117 @@ function voltar(){
     document.getElementById('tela-casos').classList.add('hidden');
 }
 
-async function computar(caso){
-    if(!confirm('Confirmar +1 para ' + timeSelecionado + '?')){
-        return;
-    }
+// Controle básico dos modais
+function abrirModal(id) {
+    fecharModais();
+    document.getElementById(id).classList.add('active');
+}
 
-    try{
-        const response = await fetch('/api/clique',{
-            method:'POST',
-            headers:{ 'Content-Type':'application/json' },
-            body:JSON.stringify({ time:timeSelecionado, caso:caso })
-        });
+function fecharModais() {
+    const modais = document.querySelectorAll('.modal-overlay');
+    modais.forEach(m => m.classList.remove('active'));
+    document.getElementById('campo-senha').value = '';
+}
 
-        const data = await response.json();
-        if(response.ok && data.success){
-            alert('Registrado! Novo total: ' + data.novoTotal);
-        }else{
-            alert(data.error || 'Erro desconhecido');
-        }
-    }catch(err){
-        alert('Erro de conexão');
+function fecharModaisEResetarInterface() {
+    fecharModais();
+    // Se foi fechamento concluído com sucesso, limpa e recarrega a página
+    if(document.getElementById('status-titulo').innerText.includes('Concluído')) {
+        window.location.reload();
     }
 }
 
-async function solicitarFechamento() {
-    const senha = prompt('Digite a senha de 4 dígitos para fazer o fechamento:');
-    if (!senha) return;
+// Feedbacks dinâmicos de processamento
+function exibirStatusProcessando(titulo, mensagem) {
+    document.getElementById('status-titulo').innerText = titulo;
+    document.getElementById('status-corpo').innerHTML = '<div class="loading-spinner"></div>' + mensagem;
+    document.getElementById('status-bloco-btn').classList.add('hidden');
+    abrirModal('m-status');
+}
 
-    if (!confirm('Isto irá disparar o relatório por e-mail e ZERAR a planilha. Confirma?')) return;
+function exibirStatusResultado(titulo, mensagem) {
+    document.getElementById('status-titulo').innerText = titulo;
+    document.getElementById('status-corpo').innerHTML = mensagem;
+    document.getElementById('status-bloco-btn').classList.remove('hidden');
+    abrirModal('m-status');
+}
+
+// --- LOGICA FLUXO 1: ADICIONAR DESVIO COMPORTAMENTAL ---
+function pedirConfirmacaoClique(caso) {
+    if (bloqueioEnvio) return;
+    casoSelecionado = caso;
+    document.getElementById('txt-confirm-clique').innerHTML = 'Deseja somar <b>+1</b> para o <b>GRUPO ' + timeSelecionado + '</b> no desvio:<br><br>"' + caso + '"?';
+    abrirModal('m-confirm-clique');
+}
+
+async function executarEnvioClique() {
+    fecharModais();
+    bloqueioEnvio = true;
+    exibirStatusProcessando('Gravando Dados', 'Comunicando com o robô da planilha. Por favor, guarde...');
+
+    try {
+        const response = await fetch('/api/clique', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ time: timeSelecionado, caso: casoSelecionado })
+        });
+
+        const data = await response.json();
+        bloqueioEnvio = false;
+
+        if (response.ok && data.success) {
+            exibirStatusResultado('Sucesso ✅', 'O desvio foi salvo na planilha!<br><br><b>Novo total do grupo: ' + data.novoTotal + '</b>');
+        } else {
+            exibirStatusResultado('Aviso do Sistema ❌', data.error || 'Não foi possível salvar.');
+        }
+    } catch(err) {
+        bloqueioEnvio = false;
+        exibirStatusResultado('Erro de Conexão 📡', 'Falha ao conectar ao servidor. Verifique sua internet.');
+    }
+}
+
+// --- LOGICA FLUXO 2: SOLICITAÇÃO DE SENHA E FECHAMENTO ---
+function abrirModalSenha() {
+    if (bloqueioEnvio) return;
+    abrirModal('m-senha-admin');
+    setTimeout(() => document.getElementById('campo-senha').focus(), 350);
+}
+
+function validarSenhaAdmin() {
+    const senha = document.getElementById('campo-senha').value;
+    if (!senha) return;
+    
+    if (senha === '8745') { // Validação local instantânea na interface
+        senhaDigitadaValida = senha;
+        abrirModal('m-confirm-fechamento'); // Abre a caixa de aviso de e-mail e reset
+    } else {
+        exibirStatusResultado('Senha Incorreta 🔒', 'A chave digitada não confere com o padrão administrativo.');
+    }
+}
+
+async function ejecutarProcessoFechamento() {
+    fecharModais();
+    bloqueioEnvio = true;
+    exibirStatusProcessando('Processando Turno', 'Compilando desvios, disparando relatório por e-mail e limpando planilha. Aguarde...');
 
     try {
         const response = await fetch('/api/fechamento', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ senha: senha })
+            body: JSON.stringify({ senha: senhaDigitadaValida })
         });
 
+        bloqueioEnvio = false;
+
         if (response.ok) {
-            alert('Fechamento realizado! Relatório enviado e dados zerados.');
-            window.location.reload();
+            exibirStatusResultado('Fechamento Concluído', '✅ O relatório foi enviado com sucesso e a planilha foi completamente resetada para o próximo turno.');
         } else {
             const data = await response.json();
-            alert('Erro: ' + (data.error || 'Não foi possível fechar.'));
+            exibirStatusResultado('Falha no Fechamento', data.error || 'O robô recusou o comando de reset.');
         }
     } catch(err) {
-        alert('Erro de rede ao processar fechamento.');
+        bloqueioEnvio = false;
+        exibirStatusResultado('Erro de Rede 📡', 'Falha crítica de comunicação de dados durante o fechamento.');
     }
 }
 </script>
