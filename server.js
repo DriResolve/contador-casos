@@ -11,8 +11,8 @@ const CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL;
 const PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
 
 // Configurações do Fechamento
-const CONFIG_SENHA = '8745'; // Mude aqui para a senha de 4 dígitos que desejar
-const LINK_FORMSPREEE = 'https://formspree.io/f/xaqkjkja'; // Crie um form gratuito no formspree.io e cole o link aqui
+const CONFIG_SENHA = '8745'; 
+const LINK_FORMSPREEE = 'https://formspree.io/f/xaqkjkja'; 
 
 // Autenticação Google
 const auth = new JWT({
@@ -21,7 +21,7 @@ const auth = new JWT({
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
-// ROTA 1: COMPUTAR CLIQUE INDIVIDUAL (Mantida sua lógica funcional)
+// ROTA 1: COMPUTAR CLIQUE INDIVIDUAL
 app.post('/api/clique', async (req, res) => {
   try {
     const { time, caso } = req.body;
@@ -84,7 +84,7 @@ app.post('/api/clique', async (req, res) => {
   }
 });
 
-// ROTA 2: PROCESSAR FECHAMENTO (EMAIL + RESET PLANILHA)
+// ROTA 2: PROCESSAR FECHAMENTO (EMAIL + RESET PLANILHA) - CONSERTADA!
 app.post('/api/fechamento', async (req, res) => {
   try {
     const { senha } = req.body;
@@ -112,19 +112,20 @@ app.post('/api/fechamento', async (req, res) => {
       const desvio = linhas[i][1];
       const cliques = parseInt(linhas[i][2] || 0);
 
-      if (colaborador) {
+      // Só processa se a linha tiver um colaborador preenchido
+      if (colaborador && colaborador.trim() !== '') {
         if (cliques > 0) {
-          relatorioTexto += `• Colaborador: ${colaborador}\n  Desvio: ${desvio}\n  Quantidade: ${cliques}\n`;
+          relatorioTexto += `• Grupo/Colaborador: ${colaborador}\n  Desvio: ${desvio}\n  Quantidade: ${cliques}\n`;
           relatorioTexto += '-----------------------------------------\n';
           dadosEncontrados = true;
         }
-        colC_Zeradada.push([0]); // Prepara a zeragem da linha
+        colC_Zeradada.push([0]); // Adiciona 0 para limpar a linha correspondente
       }
     }
 
     if (!dadosEncontrados) relatorioTexto += 'Nenhum desvio coletado neste período.\n';
 
-    // 2. Dispara o relatório por E-mail via Formspree
+    // 2. Dispara o relatório por E-mail via Formspree (Removida a trava antiga que causava erro 400)
     await fetch(LINK_FORMSPREEE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
@@ -134,7 +135,7 @@ app.post('/api/fechamento', async (req, res) => {
       })
     });
 
-    // 3. Zera a coluna C na Planilha
+    // 3. Zera a coluna C na Planilha do Google Sheets
     if (colC_Zeradada.length > 0) {
       const urlReset = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/C2:C${colC_Zeradada.length + 1}?valueInputOption=USER_ENTERED`;
       await fetch(urlReset, {
@@ -170,7 +171,7 @@ app.get('/', (req, res) => {
     --blue-accent: #007bff;
     --text-white: #ffffff;
     --text-muted: #b3b3b3;
-    --modal-overlay: rgba(0, 0, 0, 0.8);
+    --modal-overlay: rgba(0, 0, 0, 0.85);
     --modal-bg: #222222;
 }
 
@@ -202,20 +203,6 @@ body {
     width: 300px;
     height: auto;
     filter: drop-shadow(0px 4px 10px rgba(0,0,0,0.6));
-}
-
-.app-title {
-    font-size: 22px;
-    font-weight: bold;
-    margin-top: 12px;
-    color: var(--text-white);
-    letter-spacing: 0.5px;
-}
-
-.subtitle {
-    font-size: 13px;
-    color: var(--text-muted);
-    margin-top: 4px;
 }
 
 .card {
@@ -299,9 +286,7 @@ h2 {
     display: none !important;
 }
 
-/* ==========================================================================
-   ESTILOS DOS NOVOS MODAIS ARREDONDADOS (SUBSTITUTOS DO ALERT/PROMPT/CONFIRM)
-   ========================================================================== */
+/* MODAIS PERSONALIZADOS */
 .modal-overlay {
     position: fixed;
     top: 0; left: 0;
@@ -313,7 +298,7 @@ h2 {
     z-index: 1000;
     opacity: 0;
     visibility: hidden;
-    transition: all 0.3s ease;
+    transition: all 0.25s ease;
 }
 
 .modal-overlay.active {
@@ -329,8 +314,8 @@ h2 {
     border-radius: 18px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.7);
     text-align: center;
-    transform: scale(0.8);
-    transition: all 0.3s ease;
+    transform: scale(0.85);
+    transition: all 0.25s ease;
     box-sizing: border-box;
 }
 
@@ -367,10 +352,6 @@ h2 {
     outline: none;
 }
 
-.modal-input:focus {
-    border-color: var(--blue-accent);
-}
-
 .modal-flex-btns {
     display: flex;
     justify-content: center;
@@ -385,17 +366,12 @@ h2 {
     border: none;
     border-radius: 10px;
     cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
 }
 
 .m-btn-confirm { background: #28a745; color: white; }
-.m-btn-confirm:active { background: #1e7e34; }
 .m-btn-cancel { background: #dc3545; color: white; }
-.m-btn-cancel:active { background: #bd2130; }
 .m-btn-ok { background: var(--blue-accent); color: white; width: 60%; flex: none; }
-.m-btn-ok:active { background: #0056b3; }
 
-/* Spinner de Carregamento Interno */
 .loading-spinner {
     border: 4px solid rgba(255,255,255,0.1);
     border-top: 4px solid #ffc107;
@@ -450,7 +426,6 @@ h2 {
     </button>
 </div>
 
-
 <div id="m-confirm-clique" class="modal-overlay">
     <div class="modal-box">
         <h3>Confirmar Registro</h3>
@@ -495,12 +470,11 @@ h2 {
     </div>
 </div>
 
-
 <script>
 let timeSelecionado = '';
 let casoSelecionado = '';
-let senhaDigitadaValida = ''; // Guarda temporariamente para a rota de fechamento
-let bloqueioEnvio = false; // Bloqueio antiduplo clique global
+let senhaDigitadaValida = ''; 
+let bloqueioEnvio = false; 
 
 function selecionarTime(time){
     timeSelecionado = time;
@@ -515,9 +489,7 @@ function voltar(){
     document.getElementById('tela-casos').classList.add('hidden');
 }
 
-// Controle básico dos modais
 function abrirModal(id) {
-    fecharModais();
     document.getElementById(id).classList.add('active');
 }
 
@@ -528,14 +500,13 @@ function fecharModais() {
 }
 
 function fecharModaisEResetarInterface() {
+    const t = document.getElementById('status-titulo').innerText;
     fecharModais();
-    // Se foi fechamento concluído com sucesso, limpa e recarrega a página
-    if(document.getElementById('status-titulo').innerText.includes('Concluído')) {
+    if(t.includes('Concluído') || t.includes('Sucesso')) {
         window.location.reload();
     }
 }
 
-// Feedbacks dinâmicos de processamento
 function exibirStatusProcessando(titulo, mensagem) {
     document.getElementById('status-titulo').innerText = titulo;
     document.getElementById('status-corpo').innerHTML = '<div class="loading-spinner"></div>' + mensagem;
@@ -550,7 +521,6 @@ function exibirStatusResultado(titulo, mensagem) {
     abrirModal('m-status');
 }
 
-// --- LOGICA FLUXO 1: ADICIONAR DESVIO COMPORTAMENTAL ---
 function pedirConfirmacaoClique(caso) {
     if (bloqueioEnvio) return;
     casoSelecionado = caso;
@@ -561,7 +531,7 @@ function pedirConfirmacaoClique(caso) {
 async function executarEnvioClique() {
     fecharModais();
     bloqueioEnvio = true;
-    exibirStatusProcessando('Gravando Dados', 'Comunicando com o robô da planilha. Por favor, guarde...');
+    exibirStatusProcessando('Gravando Dados', 'Comunicando com o robô da planilha. Por favor, aguarde...');
 
     try {
         const response = await fetch('/api/clique', {
@@ -580,13 +550,13 @@ async function executarEnvioClique() {
         }
     } catch(err) {
         bloqueioEnvio = false;
-        exibirStatusResultado('Erro de Conexão 📡', 'Falha ao conectar ao servidor. Verifique sua internet.');
+        exibirStatusResultado('Erro de Conexão 📡', 'Falha ao conectar ao servidor.');
     }
 }
 
-// --- LOGICA FLUXO 2: SOLICITAÇÃO DE SENHA E FECHAMENTO ---
 function abrirModalSenha() {
     if (bloqueioEnvio) return;
+    fecharModais();
     abrirModal('m-senha-admin');
     setTimeout(() => document.getElementById('campo-senha').focus(), 350);
 }
@@ -595,15 +565,17 @@ function validarSenhaAdmin() {
     const senha = document.getElementById('campo-senha').value;
     if (!senha) return;
     
-    if (senha === '8745') { // Validação local instantânea na interface
+    if (senha === '8745') { 
         senhaDigitadaValida = senha;
-        abrirModal('m-confirm-fechamento'); // Abre a caixa de aviso de e-mail e reset
+        fecharModais();
+        // Delay minúsculo para a animação de transição dos modais ficar suave
+        setTimeout(() => abrirModal('m-confirm-fechamento'), 100);
     } else {
         exibirStatusResultado('Senha Incorreta 🔒', 'A chave digitada não confere com o padrão administrativo.');
     }
 }
 
-async function ejecutarProcessoFechamento() {
+async function executarProcessoFechamento() {
     fecharModais();
     bloqueioEnvio = true;
     exibirStatusProcessando('Processando Turno', 'Compilando desvios, disparando relatório por e-mail e limpando planilha. Aguarde...');
@@ -625,7 +597,7 @@ async function ejecutarProcessoFechamento() {
         }
     } catch(err) {
         bloqueioEnvio = false;
-        exibirStatusResultado('Erro de Rede 📡', 'Falha crítica de comunicação de dados durante o fechamento.');
+        exibirStatusResultado('Erro de Rede 📡', 'Falha de comunicação durante o fechamento.');
     }
 }
 </script>
