@@ -305,16 +305,16 @@ h2 {
 
 <div class="header-container">
     <button class="logo-btn" onclick="solicitarFechamento()">
-        <img class="logo-img" src="https://i.postimg.cc/28CHvmwH/Seguranca.png" alt="Segurança do Trabalho">
+        <img class="logo-img" src="https://i.postimg.cc/d003T7kJ/Seguranca.png" alt="Segurança do Trabalho">
     </button>
 </div>
 
 <div id="tela-times" class="card">
     <h2>Selecione o Grupo</h2>
-    <button class="btn-time" onclick="selecionarTime('GRUPO A')">A</button>
-    <button class="btn-time" onclick="selecionarTime('GRUPO B')">B</button>
-    <button class="btn-time" onclick="selecionarTime('GRUPO C')">C</button>
-    <button class="btn-time" onclick="selecionarTime('GRUPO D')">D</button>
+    <button class="btn-time" onclick="selecionarTime('A')">GRUPO A</button>
+    <button class="btn-time" onclick="selecionarTime('B')">GRUPO B</button>
+    <button class="btn-time" onclick="selecionarTime('C')">GRUPO C</button>
+    <button class="btn-time" onclick="selecionarTime('D')">GRUPO D</button>
 </div>
 
 <div id="tela-casos" class="card hidden">
@@ -331,7 +331,7 @@ h2 {
         <button class="btn-caso" onclick="computar('Descarte inadequado de lixo')"><span>08.</span> Descarte inadequado de lixo</button>
         <button class="btn-caso" onclick="computar('Desvio comportamental')"><span>09.</span> Desvio comportamental</button>
         <button class="btn-caso" onclick="computar('Transitar se alimentando')"><span>10.</span> Transitar se alimentando</button>
-        <button class="btn-caso" onclick="computar('Mais de uma pessoa descendo a escada ao mesmo tempo')"><span>11.</span> Mais de uma pessoa descendo a escada ao mesmo tempo</button>
+        <button class="btn-caso" onclick="computar('Uso da escada simultâneo em paralelo')"><span>11.</span> Uso da escada simultâneo em paralelo</button>
     </div>
 
     <button class="btn-time back-btn" onclick="voltar()">
