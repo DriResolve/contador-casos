@@ -471,7 +471,7 @@ h2 {
 </div>
 
 <div style="margin-top: 35px; margin-bottom: 15px; font-size: 12px; color: var(--text-muted); letter-spacing: 1px;">
-    Desenvolvido por <span style="color: var(--blue-accent); font-weight: bold;">By: Dymck</span>
+    Desenvolvido por <span style="color: var(--blue-accent); font-weight: bold;">Dymck</span>
 </div>
 
 <script>
