@@ -310,11 +310,11 @@ h2 {
 </div>
 
 <div id="tela-times" class="card">
-    <h2>Selecione o Nome</h2>
-    <button class="btn-time" onclick="selecionarTime('BIGODES')">BIGODES</button>
-    <button class="btn-time" onclick="selecionarTime('GABRIEL')">GABRIEL</button>
-    <button class="btn-time" onclick="selecionarTime('LAURA')">LAURA</button>
-    <button class="btn-time" onclick="selecionarTime('ADRIELE')">ADRIELE</button>
+    <h2>Selecione o Grupo</h2>
+    <button class="btn-time" onclick="selecionarTime('GRUPO A')">A</button>
+    <button class="btn-time" onclick="selecionarTime('GRUPO B')">B</button>
+    <button class="btn-time" onclick="selecionarTime('GRUPO C')">C</button>
+    <button class="btn-time" onclick="selecionarTime('GRUPO D')">D</button>
 </div>
 
 <div id="tela-casos" class="card hidden">
