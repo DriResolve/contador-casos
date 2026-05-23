@@ -305,7 +305,7 @@ h2 {
 
 <div class="header-container">
     <button class="logo-btn" onclick="solicitarFechamento()">
-        <img class="logo-img" src="https://i.postimg.cc/kMQTpLZC/Whats-App-Image-2026-05-22-at-18-13-07-removebg-preview.png" alt="Segurança do Trabalho">
+        <img class="logo-img" src="https://i.postimg.cc/28CHvmwH/Seguranca.png" alt="Segurança do Trabalho">
     </button>
 </div>
 
