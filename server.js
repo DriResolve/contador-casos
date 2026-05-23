@@ -307,8 +307,6 @@ h2 {
     <button class="logo-btn" onclick="solicitarFechamento()">
         <img class="logo-img" src="https://i.postimg.cc/kMQTpLZC/Whats-App-Image-2026-05-22-at-18-13-07-removebg-preview.png" alt="Segurança do Trabalho">
     </button>
-    <div class="app-title">SEGURANÇA DO TRABALHO</div>
-    <div class="subtitle">Inspeção e Coleta de Dados</div>
 </div>
 
 <div id="tela-times" class="card">
